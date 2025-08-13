@@ -1,0 +1,32 @@
+name: wellness_getx_app
+description: Wellness app demo using GetX - single file
+publish_to: 'none'
+
+environment:
+  sdk: ">=3.0.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  get: ^4.6.7
+  get_storage: ^2.0.3
+  google_fonts: ^6.1.0
+  iconsax: ^0.0.8
+  fl_chart: ^0.70.0
+  percent_indicator: ^4.2.2
+  table_calendar: ^3.0.9
+  intl: ^0.18.0
+  image_picker: ^0.8.7+4
+  pedometer: ^4.0.1
+  geolocator: ^11.0.0
+  flutter_foreground_task: ^6.1.1
+  syncfusion_flutter_charts: ^26.2.5
+  flutter_local_notifications: ^17.1.2
+  permission_handler:
+
+
+  flutter_iconly: ^1.0.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
