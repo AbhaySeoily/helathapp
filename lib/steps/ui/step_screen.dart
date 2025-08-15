@@ -14,15 +14,35 @@ class StepsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      // appBar: AppBar(
+      //   title: Text('Step Tracker'),
+      //   centerTitle: true,
+      //   leading: IconButton(
+      //     icon: Icon(Icons.arrow_back_ios, color: Colors.black),
+      //     onPressed: () => Navigator.pop(context),
+      //   ),
+      //   actions: [
+      //     IconButton(
+      //       icon: Icon(Icons.settings, color: Colors.black),
+      //       onPressed: () => _showGoalDialog(context),
+      //     ),
+      //   ],
+      //   iconTheme: IconThemeData(color: Colors.black), // <-- add this line
+      // ),
+
       appBar: AppBar(
         title: Text('Step Tracker'),
+        centerTitle: true,
         actions: [
           IconButton(
-            icon: Icon(Icons.settings),
+            icon: Icon(Icons.settings, color: Colors.black),
             onPressed: () => _showGoalDialog(context),
           ),
         ],
+        iconTheme: IconThemeData(color: Colors.black),
       ),
+
+
       body: Obx(() {
         final m = ctrl.model.value;
         final pct = (m.today / (m.goal == 0 ? 1 : m.goal)).clamp(0.0, 1.0);
