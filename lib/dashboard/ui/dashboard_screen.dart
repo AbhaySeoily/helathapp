@@ -49,16 +49,7 @@ class DashboardScreen extends StatelessWidget {
       appBar: AppBar(title: Text('Health Dashboard'), actions: [IconButton(icon: Icon(Iconsax.refresh), onPressed: () {  Get.snackbar('Refreshed','Mock data updated'); }), IconButton(icon: Icon(Iconsax.logout), onPressed: () => auth.logout())]),
       body: SafeArea(child: SingleChildScrollView(padding: EdgeInsets.all(kPad), child: Column(children: [
         // Steps
-        // Obx(() {
-        //   final s = dc.steps.model.value;
-        //   final pct = (s.today / (s.goal == 0 ? 1 : s.goal)).clamp(0.0, 1.0);
-        //   return _card(
-        //     leading: Container(padding: EdgeInsets.all(10), decoration: BoxDecoration(color: kPrimary.withOpacity(0.08), borderRadius: BorderRadius.circular(10)), child: Icon(Iconsax.activity, color: kPrimary)),
-        //     title: 'Steps',
-        //     subtitle: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('${s.today} steps', style: TextStyle(fontSize: 16)), SizedBox(height:6), LinearProgressIndicator(value: pct, minHeight: 8)]),
-        //     actions: [ _smallAction(Iconsax.scan, 'Details', () => Get.to(() => StepsScreen())), _smallAction(Iconsax.setting, 'Set Goal', ()=> _openSetStepsGoal(context)) ],
-        //   );
-        // }),
+
 // Steps Card for Dashboard
         Obx(() {
           final s = dc.steps.model.value;
@@ -217,15 +208,7 @@ class DashboardScreen extends StatelessWidget {
         SizedBox(height: 8),
 
         // Meals
-        // Obx(() {
-        //   final todays = dc.meal.meals.where((m) => sameDay(m.date, DateTime.now())).length;
-        //   return _card(
-        //     leading: Container(padding: EdgeInsets.all(10), decoration: BoxDecoration(color: Colors.orange.shade50, borderRadius: BorderRadius.circular(10)), child: Icon(Iconsax.receipt, color: Colors.orange)),
-        //     title: 'Meals',
-        //     subtitle: Text(' logged today'),
-        //     actions: [ _smallAction(Iconsax.add_circle, 'Add Meal', ()=> Get.to(()=> MealScreen())), _smallAction(Iconsax.scan, 'Recipes', ()=> Get.to(()=> RecipesScreen())) ],
-        //   );
-        // }),
+
         Obx(() {
           // aaj ke date ke planned meals
           final todaysPlain = dc.meal.plainMeals
