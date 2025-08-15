@@ -1,35 +1,37 @@
 class Habit {
   String name;
   String? notes;
+
+  /// Is habit completed today? (auto-true when completedCount == targetCount)
   bool done;
-  int targetCount; // Aaj ka target (kitne sub-tasks)
-  int completedCount; // Kitne complete ho gaye
+
+  /// Daily target (subtasks) e.g. 4 cigarettes / 5 chapters
+  int targetCount;
+
+  /// Completed count for today
+  int completedCount;
 
   Habit({
     required this.name,
     this.notes,
-    required this.done,
+    this.done = false,
     this.targetCount = 1,
     this.completedCount = 0,
   });
 
-  Map<String, dynamic> toMap() {
-    return {
-      'name': name,
-      'notes': notes,
-      'done': done,
-      'targetCount': targetCount,
-      'completedCount': completedCount,
-    };
-  }
+  Map<String, dynamic> toMap() => {
+    'name': name,
+    'notes': notes,
+    'done': done,
+    'targetCount': targetCount,
+    'completedCount': completedCount,
+  };
 
-  factory Habit.fromMap(Map<String, dynamic> map) {
-    return Habit(
-      name: map['name'],
-      notes: map['notes'],
-      done: map['done'],
-      targetCount: map['targetCount'] ?? 1,
-      completedCount: map['completedCount'] ?? 0,
-    );
-  }
+  factory Habit.fromMap(Map<String, dynamic> map) => Habit(
+    name: map['name'] ?? '',
+    notes: map['notes'],
+    done: (map['done'] ?? false) as bool,
+    targetCount: (map['targetCount'] ?? 1) as int,
+    completedCount: (map['completedCount'] ?? 0) as int,
+  );
 }
