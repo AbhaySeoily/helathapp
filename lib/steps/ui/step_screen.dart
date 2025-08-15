@@ -6,14 +6,7 @@ import 'package:syncfusion_flutter_charts/charts.dart';
 import '../controller/step_controller.dart';
 import 'monthly_steps_screen.dart';
 
-// lib/steps/ui/steps_screen.dart
-import 'package:flutter/material.dart' hide SelectionDetails;
-import 'package:get/get.dart';
-import 'package:intl/intl.dart';
-import 'package:syncfusion_flutter_charts/charts.dart';
 
-import '../controller/step_controller.dart';
-import 'monthly_steps_screen.dart';
 
 class StepsScreen extends StatelessWidget {
   final ctrl = Get.put(StepsController());

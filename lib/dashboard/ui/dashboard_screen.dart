@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
+import 'package:intl/intl.dart';
 
 import '../../auth/controller/AuthController.dart';
 import '../../habit/ui/habit_screen.dart';
@@ -48,24 +49,97 @@ class DashboardScreen extends StatelessWidget {
       appBar: AppBar(title: Text('Health Dashboard'), actions: [IconButton(icon: Icon(Iconsax.refresh), onPressed: () {  Get.snackbar('Refreshed','Mock data updated'); }), IconButton(icon: Icon(Iconsax.logout), onPressed: () => auth.logout())]),
       body: SafeArea(child: SingleChildScrollView(padding: EdgeInsets.all(kPad), child: Column(children: [
         // Steps
+        // Obx(() {
+        //   final s = dc.steps.model.value;
+        //   final pct = (s.today / (s.goal == 0 ? 1 : s.goal)).clamp(0.0, 1.0);
+        //   return _card(
+        //     leading: Container(padding: EdgeInsets.all(10), decoration: BoxDecoration(color: kPrimary.withOpacity(0.08), borderRadius: BorderRadius.circular(10)), child: Icon(Iconsax.activity, color: kPrimary)),
+        //     title: 'Steps',
+        //     subtitle: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('${s.today} steps', style: TextStyle(fontSize: 16)), SizedBox(height:6), LinearProgressIndicator(value: pct, minHeight: 8)]),
+        //     actions: [ _smallAction(Iconsax.scan, 'Details', () => Get.to(() => StepsScreen())), _smallAction(Iconsax.setting, 'Set Goal', ()=> _openSetStepsGoal(context)) ],
+        //   );
+        // }),
+// Steps Card for Dashboard
         Obx(() {
           final s = dc.steps.model.value;
           final pct = (s.today / (s.goal == 0 ? 1 : s.goal)).clamp(0.0, 1.0);
+          final remainingSteps = (s.goal - s.today).clamp(0, s.goal);
+
           return _card(
-            leading: Container(padding: EdgeInsets.all(10), decoration: BoxDecoration(color: kPrimary.withOpacity(0.08), borderRadius: BorderRadius.circular(10)), child: Icon(Iconsax.activity, color: kPrimary)),
+            leading: Container(
+                padding: EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                    color: kPrimary.withOpacity(0.08),
+                    borderRadius: BorderRadius.circular(10)
+                ),
+                child: Icon(Iconsax.activity, color: kPrimary)
+            ),
             title: 'Steps',
-            subtitle: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('${s.today} steps', style: TextStyle(fontSize: 16)), SizedBox(height:6), LinearProgressIndicator(value: pct, minHeight: 8)]),
-            actions: [ _smallAction(Iconsax.scan, 'Details', () => Get.to(() => StepsScreen())), _smallAction(Iconsax.setting, 'Set Goal', ()=> _openSetStepsGoal(context)) ],
+            subtitle: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                          '${NumberFormat().format(s.today)}',
+                          style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: kPrimary
+                          )
+                      ),
+                      Text(
+                          '/ ${NumberFormat().format(s.goal)}',
+                          style: TextStyle(
+                              fontSize: 16,
+                              color: Colors.grey
+                          )
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: 6),
+                  LinearProgressIndicator(
+                    value: pct,
+                    minHeight: 8,
+                    backgroundColor: Colors.grey[200],
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      pct >= 1 ? Colors.green : kPrimary,
+                    ),
+                  ),
+                  SizedBox(height: 4),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                          '${(pct * 100).toStringAsFixed(0)}%',
+                          style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey
+                          )
+                      ),
+                      Text(
+                          '${NumberFormat().format(remainingSteps)} left',
+                          style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey
+                          )
+                      ),
+                    ],
+                  ),
+                ]
+            ),
+            actions: [
+              _smallAction(Iconsax.scan, 'Details', () => Get.to(() => StepsScreen())),
+              _smallAction(Iconsax.setting, 'Set Goal', () => _openSetStepsGoal(context))
+            ],
           );
         }),
-
         SizedBox(height: 8),
 
-        // Water
-        // Water Card in Dashboard
         Obx(() {
           final w = dc.water.model.value;
-          final todayIntake = w.intakeToday(); // <-- Use today's intake
+          final todayIntake = w.intakeToday(); // <-- now returns correct value
           final pct = (todayIntake / (w.goal == 0 ? 1 : w.goal)).clamp(0.0, 1.0);
 
           return _card(
@@ -75,7 +149,7 @@ class DashboardScreen extends StatelessWidget {
                 color: Colors.blue.shade50,
                 borderRadius: BorderRadius.circular(10),
               ),
-              child: Icon(Iconsax.drop, color: Colors.blue),
+              child: Icon(Icons.water_drop, color: Colors.blue),
             ),
             title: 'Water',
             subtitle: Column(
@@ -83,7 +157,12 @@ class DashboardScreen extends StatelessWidget {
               children: [
                 Text('$todayIntake / ${w.goal} ml', style: TextStyle(fontSize: 16)),
                 SizedBox(height: 6),
-                LinearProgressIndicator(value: pct, minHeight: 8),
+                LinearProgressIndicator(
+                  value: pct,
+                  minHeight: 8,
+                  backgroundColor: Colors.grey.shade200,
+                  color: Colors.blue,
+                ),
               ],
             ),
             actions: [
@@ -102,6 +181,8 @@ class DashboardScreen extends StatelessWidget {
             ],
           );
         }),
+
+
 
 
         SizedBox(height: 8),
