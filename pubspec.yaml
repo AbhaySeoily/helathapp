@@ -23,8 +23,8 @@ dependencies:
   syncfusion_flutter_charts: ^26.2.5
   flutter_local_notifications: ^17.1.2
   permission_handler:
-
-
+  usage_stats:
+  android_intent_plus:
   flutter_iconly: ^1.0.2
 
 dev_dependencies:

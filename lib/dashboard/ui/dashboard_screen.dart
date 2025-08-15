@@ -45,7 +45,7 @@ class DashboardScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final auth = Get.find<AuthController>();
     return Scaffold(
-      appBar: AppBar(title: Text('Health Dashboard'), actions: [IconButton(icon: Icon(Iconsax.refresh), onPressed: () {  dc.screen.randomize(); Get.snackbar('Refreshed','Mock data updated'); }), IconButton(icon: Icon(Iconsax.logout), onPressed: () => auth.logout())]),
+      appBar: AppBar(title: Text('Health Dashboard'), actions: [IconButton(icon: Icon(Iconsax.refresh), onPressed: () {  Get.snackbar('Refreshed','Mock data updated'); }), IconButton(icon: Icon(Iconsax.logout), onPressed: () => auth.logout())]),
       body: SafeArea(child: SingleChildScrollView(padding: EdgeInsets.all(kPad), child: Column(children: [
         // Steps
         Obx(() {

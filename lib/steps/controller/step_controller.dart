@@ -42,13 +42,22 @@ class StepsController extends GetxController {
     _scheduleDailyNotification();
   }
 
+
   Future<void> _initPermissions() async {
-    // Android 10+ activity recognition
+    // Request activity recognition (step counting)
     await Permission.activityRecognition.request();
+
+    // Request location permissions (required for FGS with type 'location')
+    await Permission.locationWhenInUse.request();
+
+    // If background location is needed:
+    if (await Permission.locationWhenInUse.isGranted) {
+      await Permission.locationAlways.request();
+    }
+
     // Battery optimization ignore (for bg service stability)
     await FlutterForegroundTask.requestIgnoreBatteryOptimization();
   }
-
   void _initNotifications() async {
     const AndroidInitializationSettings initializationSettingsAndroid =
     AndroidInitializationSettings('ic_launcher');
