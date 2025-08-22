@@ -26,7 +26,14 @@ dependencies:
   usage_stats:
   android_intent_plus:
   flutter_iconly: ^1.0.2
+  syncfusion_flutter_gauges:
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
+
+  flutter_lints: ^2.0.0
+
+flutter:
+  generate: true
+  uses-material-design: true

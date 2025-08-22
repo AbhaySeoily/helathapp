@@ -1,52 +1,38 @@
 import 'package:flutter/material.dart' hide SelectionDetails;
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
-import 'package:syncfusion_flutter_charts/charts.dart';
 
+import 'package:syncfusion_flutter_charts/charts.dart' as sfcharts;
+import 'package:syncfusion_flutter_gauges/gauges.dart' as sfgauge;
+
+import '../../notification/notification_service.dart';
 import '../controller/step_controller.dart';
 import 'monthly_steps_screen.dart';
-
 
 
 class StepsScreen extends StatelessWidget {
   final ctrl = Get.put(StepsController());
 
+  StepsScreen({super.key});
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      // appBar: AppBar(
-      //   title: Text('Step Tracker'),
-      //   centerTitle: true,
-      //   leading: IconButton(
-      //     icon: Icon(Icons.arrow_back_ios, color: Colors.black),
-      //     onPressed: () => Navigator.pop(context),
-      //   ),
-      //   actions: [
-      //     IconButton(
-      //       icon: Icon(Icons.settings, color: Colors.black),
-      //       onPressed: () => _showGoalDialog(context),
-      //     ),
-      //   ],
-      //   iconTheme: IconThemeData(color: Colors.black), // <-- add this line
-      // ),
-
       appBar: AppBar(
-        title: Text('Step Tracker'),
+        title: const Text('Step Tracker'),
         centerTitle: true,
         actions: [
           IconButton(
-            icon: Icon(Icons.settings, color: Colors.black),
-            onPressed: () => _showGoalDialog(context),
+            icon: const Icon(Icons.settings, color: Colors.black),
+           onPressed: () => _showGoalDialog(context)
+           // onPressed: () =>     NotificationService.showTestNotification()
+            ,
           ),
         ],
-        iconTheme: IconThemeData(color: Colors.black),
+        iconTheme: const IconThemeData(color: Colors.black),
       ),
-
-
       body: Obx(() {
         final m = ctrl.model.value;
-        final pct = (m.today / (m.goal == 0 ? 1 : m.goal)).clamp(0.0, 1.0);
-        final remainingSteps = (m.goal - m.today).clamp(0, m.goal);
         final last7 = (m.last7.length == 7) ? m.last7 : List.filled(7, 0);
 
         return SingleChildScrollView(
@@ -54,127 +40,222 @@ class StepsScreen extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // Today's Progress Card
               Card(
-                elevation: 4,
+                elevation: 6,
+                shadowColor: Colors.blue.withOpacity(0.3),
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
+                    borderRadius: BorderRadius.circular(20)),
                 child: Padding(
                   padding: const EdgeInsets.all(20),
                   child: Column(
                     children: [
-                      Text(
-                        'Today',
+                      const Text(
+                        "Total Steps Today",
                         style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.grey[600],
-                        ),
+                            fontSize: 22,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.blue),
                       ),
-                      SizedBox(height: 10),
-                      Text(
-                        NumberFormat().format(m.today),
-                        style: TextStyle(
-                          fontSize: 42,
-                          fontWeight: FontWeight.bold,
-                          color: Theme.of(context).primaryColor,
-                        ),
-                      ),
-                      Text(
-                        'Steps',
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: Colors.grey,
-                        ),
-                      ),
-                      SizedBox(height: 20),
-                      LinearProgressIndicator(
-                        value: pct,
-                        minHeight: 12,
-                        borderRadius: BorderRadius.circular(6),
-                        backgroundColor: Colors.grey[200],
-                        valueColor: AlwaysStoppedAnimation<Color>(
-                          pct >= 1 ? Colors.green : Theme.of(context).primaryColor,
-                        ),
-                      ),
-                      SizedBox(height: 10),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            '${(pct * 100).toStringAsFixed(0)}%',
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              color: pct >= 1 ? Colors.green : Theme.of(context).primaryColor,
+                      const SizedBox(height: 20),
+
+                      // Gauge
+                      SizedBox(
+                        height: 320,
+                        child: Column(
+                          children: [
+                            SizedBox(
+                              height: 200,
+                              child: sfgauge.SfRadialGauge(
+                                axes: <sfgauge.RadialAxis>[
+                                  sfgauge.RadialAxis(
+                                    minimum: 0,
+                                    maximum:
+                                        (m.goal <= 0 ? 1 : m.goal).toDouble(),
+                                    startAngle: 180,
+                                    endAngle: 0,
+                                    showTicks: true,
+                                    showLabels: false,
+                                    axisLineStyle: sfgauge.AxisLineStyle(
+                                      thickness: 0.04,
+                                      thicknessUnit:
+                                          sfgauge.GaugeSizeUnit.factor,
+                                      color: Colors.grey.shade300,
+                                    ),
+                                    pointers: <sfgauge.GaugePointer>[
+                                      sfgauge.RangePointer(
+                                        value: m.today.toDouble(),
+                                        width: 0.04,
+                                        sizeUnit: sfgauge.GaugeSizeUnit.factor,
+                                        color: Colors.orange,
+                                        cornerStyle:
+                                            sfgauge.CornerStyle.bothCurve,
+                                      ),
+                                    ],
+                                    annotations: <sfgauge.GaugeAnnotation>[
+                                      sfgauge.GaugeAnnotation(
+                                        angle: 90,
+                                        positionFactor: 0.1,
+                                        widget: Column(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            const Text("Steps",
+                                                style: TextStyle(
+                                                    fontSize: 16,
+                                                    color: Colors.grey)),
+                                            const SizedBox(height: 6),
+                                            Text(
+                                              "${m.today}",
+                                              style: const TextStyle(
+                                                  fontSize: 38,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: Colors.black),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
                             ),
-                          ),
-                          Text(
-                            '${NumberFormat().format(remainingSteps)} steps left',
-                            style: TextStyle(color: Colors.grey),
-                          ),
-                        ],
+
+                            const SizedBox(height: 12),
+
+                            // Progress bar
+                            Padding(
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 12.0),
+                              child: LinearProgressIndicator(
+                                value: (m.goal == 0)
+                                    ? 0
+                                    : (m.today / m.goal).clamp(0.0, 1.0),
+                                minHeight: 6,
+                                backgroundColor: Colors.red.shade100,
+                                valueColor: const AlwaysStoppedAnimation<Color>(
+                                    Colors.redAccent),
+                              ),
+                            ),
+
+                            const SizedBox(height: 16),
+
+                            // Slow vs Brisk
+                            Padding(
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 16.0),
+                              child: Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      const Text("Slow walking",
+                                          style: TextStyle(
+                                              color: Colors.grey,
+                                              fontSize: 12)),
+                                      const SizedBox(height: 4),
+                                      Obx(() => Text(
+                                            "${ctrl.slowSteps.value} steps",
+                                            style: const TextStyle(
+                                                fontSize: 14,
+                                                fontWeight: FontWeight.w600,
+                                                color: Colors.blue),
+                                          )),
+                                    ],
+                                  ),
+                                  Column(
+                                    crossAxisAlignment: CrossAxisAlignment.end,
+                                    children: [
+                                      const Text("Brisk walking",
+                                          style: TextStyle(
+                                              color: Colors.grey,
+                                              fontSize: 12)),
+                                      const SizedBox(height: 4),
+                                      Obx(() => Text(
+                                            "${ctrl.briskSteps.value} steps",
+                                            style: const TextStyle(
+                                                fontSize: 14,
+                                                fontWeight: FontWeight.w600,
+                                                color: Colors.green),
+                                          )),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      const SizedBox(height: 10),
+
+                      // Overall %
+                      Text(
+                        "${(m.goal == 0 ? 0 : (m.today / m.goal) * 100).toStringAsFixed(1)}% Completed",
+                        style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w500,
+                            color: Colors.grey),
                       ),
                     ],
                   ),
                 ),
               ),
-              SizedBox(height: 20),
+
+              const SizedBox(height: 20),
 
               // Goal Info
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    'Daily Goal',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                  ),
+                  const Text('Daily Goal',
+                      style:
+                          TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                   Text(
                     '${NumberFormat().format(m.goal)} steps',
                     style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Theme.of(context).primaryColor,
-                    ),
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Theme.of(context).primaryColor),
                   ),
                 ],
               ),
-              SizedBox(height: 20),
+              const SizedBox(height: 20),
 
               // Weekly Chart
-              Text(
-                'Last 7 Days',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-              SizedBox(height: 10),
-              Container(
-                height: 200,
-                child: SfCartesianChart(
-                  primaryXAxis: CategoryAxis(),
-                  series: <ColumnSeries<int, String>>[
-                    ColumnSeries<int, String>(
+              const Text('Last 7 Days',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 10),
+              SizedBox(
+                height: 220,
+                child: sfcharts.SfCartesianChart(
+                  primaryXAxis: const sfcharts.CategoryAxis(),
+                  series: <sfcharts.ColumnSeries<int, String>>[
+                    sfcharts.ColumnSeries<int, String>(
                       dataSource: last7,
-                      xValueMapper: (data, index) =>
-                          DateFormat('E').format(DateTime.now().subtract(Duration(days: 6 - index))),
+                      xValueMapper: (data, index) => DateFormat('E').format(
+                          DateTime.now().subtract(Duration(days: 6 - index))),
                       yValueMapper: (data, _) => data,
                       color: Theme.of(context).primaryColor,
-                      borderRadius: const BorderRadius.vertical(top: Radius.circular(4)),
-                    )
+                      borderRadius:
+                          const BorderRadius.vertical(top: Radius.circular(4)),
+                    ),
                   ],
                 ),
               ),
-              SizedBox(height: 20),
 
-              // Monthly Chart Button
+              const SizedBox(height: 20),
+
+              // Monthly page
               ElevatedButton(
                 onPressed: () => Get.to(() => MonthlyStepsScreen()),
-                child: Text('View Monthly Progress'),
                 style: ElevatedButton.styleFrom(
-                  padding: EdgeInsets.symmetric(vertical: 16),
+                  padding: const EdgeInsets.symmetric(vertical: 16),
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
+                      borderRadius: BorderRadius.circular(12)),
                 ),
+                child: const Text('View Monthly Progress'),
               ),
             ],
           ),
@@ -185,617 +266,33 @@ class StepsScreen extends StatelessWidget {
 
   void _showGoalDialog(BuildContext context) {
     final ctrl = Get.find<StepsController>();
-    final textController = TextEditingController(text: ctrl.model.value.goal.toString());
+    final textController =
+        TextEditingController(text: ctrl.model.value.goal.toString());
 
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('Set Daily Goal'),
+        title: const Text('Set Daily Goal'),
         content: TextField(
           controller: textController,
           keyboardType: TextInputType.number,
-          decoration: InputDecoration(
-            labelText: 'Steps',
-            border: OutlineInputBorder(),
-          ),
+          decoration: const InputDecoration(
+              labelText: 'Steps', border: OutlineInputBorder()),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: Text('Cancel')),
+          TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel')),
           ElevatedButton(
             onPressed: () {
               final goal = int.tryParse(textController.text) ?? 8000;
               ctrl.setGoal(goal);
               Navigator.pop(context);
             },
-            child: Text('Save'),
+            child: const Text('Save'),
           ),
         ],
       ),
     );
   }
 }
-
-
-// class StepsScreen extends StatelessWidget {
-//   final ctrl = Get.put(StepsController());
-//
-//   @override
-//   Widget build(BuildContext context) {
-//     return Scaffold(
-//       appBar: AppBar(
-//         title: Text('Step Tracker'),
-//         actions: [
-//           IconButton(
-//             icon: Icon(Icons.settings),
-//             onPressed: () => _showGoalDialog(context),
-//           ),
-//         ],
-//       ),
-//       body: Obx(() {
-//         final m = ctrl.model.value;
-//         final pct = (m.today / (m.goal == 0 ? 1 : m.goal)).clamp(0.0, 1.0);
-//         final remainingSteps = (m.goal - m.today).clamp(0, m.goal);
-//
-//         return SingleChildScrollView(
-//           padding: const EdgeInsets.all(16),
-//           child: Column(
-//             crossAxisAlignment: CrossAxisAlignment.stretch,
-//             children: [
-//               // Today's Progress Card
-//               Card(
-//                 elevation: 4,
-//                 shape: RoundedRectangleBorder(
-//                   borderRadius: BorderRadius.circular(16),
-//                 ),
-//                 child: Padding(
-//                   padding: const EdgeInsets.all(20),
-//                   child: Column(
-//                     children: [
-//                       Text(
-//                         'Today',
-//                         style: TextStyle(
-//                           fontSize: 18,
-//                           fontWeight: FontWeight.bold,
-//                           color: Colors.grey[600],
-//                         ),
-//                       ),
-//                       SizedBox(height: 10),
-//                       Text(
-//                         '${NumberFormat().format(m.today)}',
-//                         style: TextStyle(
-//                           fontSize: 42,
-//                           fontWeight: FontWeight.bold,
-//                           color: Theme.of(context).primaryColor,
-//                         ),
-//                       ),
-//                       Text(
-//                         'Steps',
-//                         style: TextStyle(
-//                           fontSize: 16,
-//                           color: Colors.grey,
-//                         ),
-//                       ),
-//                       SizedBox(height: 20),
-//                       LinearProgressIndicator(
-//                         value: pct,
-//                         minHeight: 12,
-//                         borderRadius: BorderRadius.circular(6),
-//                         backgroundColor: Colors.grey[200],
-//                         valueColor: AlwaysStoppedAnimation<Color>(
-//                           pct >= 1 ? Colors.green : Theme.of(context).primaryColor,
-//                         ),
-//                       ),
-//                       SizedBox(height: 10),
-//                       Row(
-//                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
-//                         children: [
-//                           Text(
-//                             '${(pct * 100).toStringAsFixed(0)}%',
-//                             style: TextStyle(
-//                               fontWeight: FontWeight.bold,
-//                               color: pct >= 1 ? Colors.green : Theme.of(context).primaryColor,
-//                             ),
-//                           ),
-//                           Text(
-//                             '${NumberFormat().format(remainingSteps)} steps left',
-//                             style: TextStyle(
-//                               color: Colors.grey,
-//                             ),
-//                           ),
-//                         ],
-//                       ),
-//                     ],
-//                   ),
-//                 ),
-//               ),
-//               SizedBox(height: 20),
-//
-//               // Goal Info
-//               Row(
-//                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
-//                 children: [
-//                   Text(
-//                     'Daily Goal',
-//                     style: TextStyle(
-//                       fontSize: 18,
-//                       fontWeight: FontWeight.bold,
-//                     ),
-//                   ),
-//                   Text(
-//                     '${NumberFormat().format(m.goal)} steps',
-//                     style: TextStyle(
-//                       fontSize: 18,
-//                       fontWeight: FontWeight.bold,
-//                       color: Theme.of(context).primaryColor,
-//                     ),
-//                   ),
-//                 ],
-//               ),
-//               SizedBox(height: 20),
-//
-//               // Weekly Chart
-//               Text(
-//                 'Last 7 Days',
-//                 style: TextStyle(
-//                   fontSize: 18,
-//                   fontWeight: FontWeight.bold,
-//                 ),
-//               ),
-//               SizedBox(height: 10),
-//               Container(
-//                 height: 200,
-//                 child: SfCartesianChart(
-//                   primaryXAxis: CategoryAxis(),
-//                   series: <ColumnSeries<int, String>>[
-//                     ColumnSeries<int, String>(
-//                       dataSource: m.last7,
-//                       xValueMapper: (data, index) =>
-//                           DateFormat('E').format(DateTime.now().subtract(Duration(days: 6 - index))),
-//                       yValueMapper: (data, _) => data,
-//                       color: Theme.of(context).primaryColor,
-//                       borderRadius: BorderRadius.vertical(top: Radius.circular(4)),
-//                     )
-//                   ],
-//                 ),
-//               ),
-//               SizedBox(height: 20),
-//
-//               // Monthly Chart Button
-//               ElevatedButton(
-//                 onPressed: () => Get.to(() => MonthlyStepsScreen()),
-//                 child: Text('View Monthly Progress'),
-//                 style: ElevatedButton.styleFrom(
-//                   padding: EdgeInsets.symmetric(vertical: 16),
-//                   shape: RoundedRectangleBorder(
-//                     borderRadius: BorderRadius.circular(12),
-//                   ),
-//                 ),
-//               ),
-//             ],
-//           ),
-//         );
-//       }),
-//     );
-//   }
-//
-//   void _showGoalDialog(BuildContext context) {
-//     final ctrl = Get.find<StepsController>();
-//     final textController = TextEditingController(text: ctrl.model.value.goal.toString());
-//
-//     showDialog(
-//       context: context,
-//       builder: (context) => AlertDialog(
-//         title: Text('Set Daily Goal'),
-//         content: TextField(
-//           controller: textController,
-//           keyboardType: TextInputType.number,
-//           decoration: InputDecoration(
-//             labelText: 'Steps',
-//             border: OutlineInputBorder(),
-//           ),
-//         ),
-//         actions: [
-//           TextButton(
-//             onPressed: () => Navigator.pop(context),
-//             child: Text('Cancel'),
-//           ),
-//           ElevatedButton(
-//             onPressed: () {
-//               final goal = int.tryParse(textController.text) ?? 8000;
-//               ctrl.setGoal(goal);
-//               Navigator.pop(context);
-//             },
-//             child: Text('Save'),
-//           ),
-//         ],
-//       ),
-//     );
-//   }
-// }
-
-
-
-
-
-// import 'package:flutter/material.dart';
-// import 'package:get/get.dart';
-//
-// import '../../main.dart';
-// import '../controller/step_background_handler.dart';
-// import '../controller/step_controller.dart';
-//
-// /// ---------------- Steps Screen & history ----------------
-//
-// import 'package:flutter/material.dart';
-// import 'package:get/get.dart';
-// import 'package:flutter_foreground_task/flutter_foreground_task.dart';
-//
-// import 'package:flutter/material.dart';
-// import 'package:get/get.dart';
-// import 'package:syncfusion_flutter_charts/charts.dart';
-// import 'package:intl/intl.dart';
-//
-// class StepsScreen extends StatelessWidget {
-//   final ctrl = Get.put(StepsController());
-//
-//   @override
-//   Widget build(BuildContext context) {
-//     return Scaffold(
-//       appBar: AppBar(
-//         title: Text('Step Tracker'),
-//         actions: [
-//           IconButton(
-//             icon: Icon(Icons.settings),
-//             onPressed: () => _showGoalDialog(context),
-//           ),
-//         ],
-//       ),
-//       body: Obx(() {
-//         final m = ctrl.model.value;
-//         final pct = (m.today / (m.goal == 0 ? 1 : m.goal)).clamp(0.0, 1.0);
-//         final remainingSteps = (m.goal - m.today).clamp(0, m.goal);
-//
-//         return SingleChildScrollView(
-//           padding: const EdgeInsets.all(16),
-//           child: Column(
-//             crossAxisAlignment: CrossAxisAlignment.stretch,
-//             children: [
-//               // Today's Progress Card
-//               Card(
-//                 elevation: 4,
-//                 shape: RoundedRectangleBorder(
-//                   borderRadius: BorderRadius.circular(16),
-//                 ),
-//                 child: Padding(
-//                   padding: const EdgeInsets.all(20),
-//                   child: Column(
-//                     children: [
-//                       Text(
-//                         'Today',
-//                         style: TextStyle(
-//                           fontSize: 18,
-//                           fontWeight: FontWeight.bold,
-//                           color: Colors.grey[600],
-//                         ),
-//                       ),
-//                       SizedBox(height: 10),
-//                       Text(
-//                         '${NumberFormat().format(m.today)}',
-//                         style: TextStyle(
-//                           fontSize: 42,
-//                           fontWeight: FontWeight.bold,
-//                           color: Theme.of(context).primaryColor,
-//                         ),
-//                       ),
-//                       Text(
-//                         'Steps',
-//                         style: TextStyle(
-//                           fontSize: 16,
-//                           color: Colors.grey,
-//                         ),
-//                       ),
-//                       SizedBox(height: 20),
-//                       LinearProgressIndicator(
-//                         value: pct,
-//                         minHeight: 12,
-//                         borderRadius: BorderRadius.circular(6),
-//                         backgroundColor: Colors.grey[200],
-//                         valueColor: AlwaysStoppedAnimation<Color>(
-//                           pct >= 1 ? Colors.green : Theme.of(context).primaryColor,
-//                         ),
-//                       ),
-//                       SizedBox(height: 10),
-//                       Row(
-//                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
-//                         children: [
-//                           Text(
-//                             '${(pct * 100).toStringAsFixed(0)}%',
-//                             style: TextStyle(
-//                               fontWeight: FontWeight.bold,
-//                               color: pct >= 1 ? Colors.green : Theme.of(context).primaryColor,
-//                             ),
-//                           ),
-//                           Text(
-//                             '${NumberFormat().format(remainingSteps)} steps left',
-//                             style: TextStyle(
-//                               color: Colors.grey,
-//                             ),
-//                           ),
-//                         ],
-//                       ),
-//                     ],
-//                   ),
-//                 ),
-//               ),
-//               SizedBox(height: 20),
-//
-//               // Goal Info
-//               Row(
-//                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
-//                 children: [
-//                   Text(
-//                     'Daily Goal',
-//                     style: TextStyle(
-//                       fontSize: 18,
-//                       fontWeight: FontWeight.bold,
-//                     ),
-//                   ),
-//                   Text(
-//                     '${NumberFormat().format(m.goal)} steps',
-//                     style: TextStyle(
-//                       fontSize: 18,
-//                       fontWeight: FontWeight.bold,
-//                       color: Theme.of(context).primaryColor,
-//                     ),
-//                   ),
-//                 ],
-//               ),
-//               SizedBox(height: 20),
-//
-//               // Weekly Chart
-//               Text(
-//                 'Last 7 Days',
-//                 style: TextStyle(
-//                   fontSize: 18,
-//                   fontWeight: FontWeight.bold,
-//                 ),
-//               ),
-//               SizedBox(height: 10),
-//               Container(
-//                 height: 200,
-//                 child: SfCartesianChart(
-//                   primaryXAxis: CategoryAxis(),
-//                   series: <ColumnSeries<int, String>>[
-//                   ColumnSeries<int, String>(
-//                 dataSource: m.last7,
-//                 xValueMapper: (data, index) =>
-//                     DateFormat('E').format(DateTime.now().subtract(Duration(days: 6 - index))),
-//                 yValueMapper: (data, _) => data,
-//                 color: Theme.of(context).primaryColor,
-//                 borderRadius: BorderRadius.vertical(top: Radius.circular(4)),
-//                   )],
-//                 ),
-//               ),
-//               SizedBox(height: 20),
-//
-//               // Monthly Chart Button
-//               ElevatedButton(
-//                 onPressed: () => Get.to(() => MonthlyStepsScreen()),
-//                 child: Text('View Monthly Progress'),
-//                 style: ElevatedButton.styleFrom(
-//                   padding: EdgeInsets.symmetric(vertical: 16),
-//                   shape: RoundedRectangleBorder(
-//                     borderRadius: BorderRadius.circular(12),
-//                   ),
-//                 ),
-//               ),
-//             ],
-//           ),
-//         );
-//       }),
-//     );
-//   }
-//
-//   void _showGoalDialog(BuildContext context) {
-//     final ctrl = Get.find<StepsController>();
-//     final textController = TextEditingController(text: ctrl.model.value.goal.toString());
-//
-//     showDialog(
-//       context: context,
-//       builder: (context) => AlertDialog(
-//         title: Text('Set Daily Goal'),
-//         content: TextField(
-//           controller: textController,
-//           keyboardType: TextInputType.number,
-//           decoration: InputDecoration(
-//             labelText: 'Steps',
-//             border: OutlineInputBorder(),
-//           ),
-//         ),
-//         actions: [
-//           TextButton(
-//             onPressed: () => Navigator.pop(context),
-//             child: Text('Cancel'),
-//           ),
-//           ElevatedButton(
-//             onPressed: () {
-//               final goal = int.tryParse(textController.text) ?? 8000;
-//               ctrl.setGoal(goal);
-//               Navigator.pop(context);
-//             },
-//             child: Text('Save'),
-//           ),
-//         ],
-//       ),
-//     );
-//   }
-// }
-//
-// class MonthlyStepsScreen extends StatelessWidget {
-//   final StepsController ctrl = Get.find();
-//
-//   @override
-//   Widget build(BuildContext context) {
-//     return Scaffold(
-//       appBar: AppBar(title: Text('Monthly Progress')),
-//       body: FutureBuilder<Map<DateTime, int>>(
-//         future: ctrl.getMonthlySteps(),
-//         builder: (context, snapshot) {
-//           if (snapshot.connectionState == ConnectionState.waiting) {
-//             return Center(child: CircularProgressIndicator());
-//           }
-//
-//           if (!snapshot.hasData || snapshot.data!.isEmpty) {
-//             return Center(child: Text('No data available'));
-//           }
-//
-//           final data = snapshot.data!;
-//           final dates = data.keys.toList()..sort();
-//           final values = dates.map((date) => data[date] ?? 0).toList();
-//
-//           return Padding(
-//             padding: const EdgeInsets.all(16),
-//             child: Column(
-//               children: [
-//                 Container(
-//                   height: 300,
-//                   child: SfCartesianChart(
-//                     primaryXAxis: DateTimeAxis(
-//                       dateFormat: DateFormat('d MMM'),
-//                       intervalType: DateTimeIntervalType.days,
-//                       interval: 3,
-//                     ),
-//                     series: <LineSeries<int, DateTime>>[
-//                       LineSeries<int, DateTime>(
-//                         dataSource: values,
-//                         xValueMapper: (_, index) => dates[index],
-//                         yValueMapper: (data, _) => data,
-//                         color: Theme.of(context).primaryColor,
-//                         markerSettings: MarkerSettings(isVisible: true),
-//                       ),
-//                     ],
-//                   ),
-//                 ),
-//                 SizedBox(height: 20),
-//                 Expanded(
-//                   child: ListView.builder(
-//                     itemCount: dates.length,
-//                     itemBuilder: (context, index) {
-//                       final date = dates[index];
-//                       final steps = values[index];
-//                       return ListTile(
-//                         title: Text(DateFormat('MMMM d, y').format(date)),
-//                         trailing: Text('$steps steps'),
-//                       );
-//                     },
-//                   ),
-//                 ),
-//               ],
-//             ),
-//           );
-//         },
-//       ),
-//     );
-//   }
-// }
-
-//
-// class StepsScreen extends StatelessWidget {
-//   final ctrl = Get.put(StepsController());
-//
-//   @override
-//   Widget build(BuildContext context) {
-//     return Scaffold(
-//       appBar: AppBar(title: Text('Step Tracker')),
-//       body: Padding(
-//         padding: const EdgeInsets.all(16),
-//         child: Obx(() {
-//           final m = ctrl.model.value;
-//           final pct = (m.today / (m.goal == 0 ? 1 : m.goal)).clamp(0.0, 1.0);
-//           return Column(
-//             children: [
-//               Text('${m.today} Steps', style: TextStyle(fontSize: 36)),
-//               LinearProgressIndicator(value: pct),
-//               Text('Goal: ${m.goal}'),
-//             ],
-//           );
-//         }),
-//       ),
-//     );
-//   }
-// }
-
-
-
-// class StepsScreen extends StatelessWidget {
-//   final ctrl = Get.find<StepsController>();
-//   StepsScreen({Key? key}) : super(key: key);
-//
-//   List<FlSpot> _toSpots(List<int> data) {
-//     final len = data.length;
-//     return List.generate(len, (i) => FlSpot(i.toDouble(), data[i].toDouble()));
-//   }
-//
-//   @override
-//   Widget build(BuildContext context) {
-//     return Scaffold(
-//       appBar: AppBar(title: Text('Steps')),
-//       body: Padding(padding: EdgeInsets.all(kPad), child: Column(children: [
-//         Obx(() {
-//           final m = ctrl.model.value;
-//           final pct = (m.today / (m.goal==0?1:m.goal)).clamp(0.0,1.0);
-//           final calories = (m.today * 0.04).toStringAsFixed(1);
-//           final dist = (m.today * 0.0008).toStringAsFixed(2);
-//           return Column(children: [
-//             Text('${m.today}', style: TextStyle(fontSize: 44, fontWeight: FontWeight.bold)),
-//             SizedBox(height:8),
-//             LinearProgressIndicator(value: pct, minHeight: 10),
-//             SizedBox(height:8),
-//             Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [
-//               Column(children: [Text('Calories'), SizedBox(height:4), Text('$calories kcal')]),
-//               Column(children: [Text('Distance'), SizedBox(height:4), Text('$dist km')]),
-//             ]),
-//             SizedBox(height: 12),
-//             Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-//               ElevatedButton(onPressed: ()=> ctrl.addSteps(500), child: Text('+500 (mock)')),
-//               SizedBox(width:12),
-//               OutlinedButton(onPressed: ()=> _openSetGoal(context), child: Text('Set Goal')),
-//             ])
-//           ]);
-//         }),
-//
-//         SizedBox(height: 12),
-//
-//         // Expanded(child: Card(child: Padding(padding: EdgeInsets.all(8), child: Obx(() {
-//         //   final data = ctrl.model.value.last7;
-//         //   final spots = _toSpots(data.reversed.toList()); // show last7 with oldest first
-//         //   return LineChart(LineChartData(
-//         //     lineBarsData: [LineChartBarData(spots: spots, isCurved: true, color: kPrimary, dotData: FlDotData(show:false))],
-//         //     minY: 0,
-//         //     gridData: FlGridData(show:false),
-//         //     titlesData: FlTitlesData(bottomTitles: AxisTitles(sideTitles: SideTitles(showTitles:true,getTitlesWidget: (v,meta){
-//         //       final idx = v.toInt();
-//         //       final label = ['6d','5d','4d','3d','2d','1d','Today'];
-//         //       if (idx >=0 && idx < label.length) return SideTitleWidget(child: Text(label[idx], style: TextStyle(fontSize:10)), side: meta.axisSide);
-//         //       return SideTitleWidget(child: Text(''), axisSide: meta.axisSide);
-//         //     }),), leftTitles: AxisTitles(sideTitles: SideTitles(showTitles:false))),
-//         //   ));
-//         // })))),
-//
-//       ])),
-//     );
-//   }
-//
-//   void _openSetGoal(BuildContext ctx) {
-//     final tc = TextEditingController(text: ctrl.model.value.goal.toString());
-//     showDialog(context: ctx, builder: (_) => AlertDialog(
-//       title: Text('Set step goal'),
-//       content: TextField(controller: tc, keyboardType: TextInputType.number),
-//       actions: [ TextButton(onPressed: ()=> Get.back(), child: Text('Cancel')), TextButton(onPressed: (){
-//         final v = int.tryParse(tc.text.trim());
-//         if (v!=null) ctrl.setGoal(v);
-//         Get.back();
-//       }, child: Text('Save')) ],
-//     ));
-//   }
-// }

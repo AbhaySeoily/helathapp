@@ -52,6 +52,11 @@ import 'package:get_storage/get_storage.dart';
 import '../../../main.dart';
 import '../../model/water_model.dart';
 
+import 'package:flutter/material.dart';
+import 'package:get/get.dart';
+import 'package:get_storage/get_storage.dart';
+import '../../model/water_model.dart';
+
 class WaterController extends GetxController {
   final box = GetStorage();
   Rx<WaterModel> model = WaterModel(goal: 2000).obs;
@@ -65,36 +70,47 @@ class WaterController extends GetxController {
     }
   }
 
-  void addWater(int ml) {
+  void addWater(int ml, {bool beforeReminder = true}) {
     model.update((m) {
       if (m == null) return;
 
-      // Today key
       final key = DateTime.now().toIso8601String().split('T')[0];
-
-      // Update dailyIntake with a new map
-      final updatedDaily = {...m.dailyIntake};
-      updatedDaily[key] = (updatedDaily[key] ?? 0) + ml;
-      m.dailyIntake = updatedDaily;
-
-      // Update today's intake
-      m.intake = updatedDaily[key]!;
-
-      // Update last7 with a new list
+      m.dailyIntake[key] = (m.dailyIntake[key] ?? 0) + ml;
+      m.intake = m.dailyIntake[key]!;
       m.last7 = [m.intake, ...m.last7.sublist(1)];
     });
 
-    // Save to storage
+    // Award points
+    final prevPoints = box.read(KS_WATER_REWARD) ?? 0;
+    box.write(KS_WATER_REWARD, prevPoints + (beforeReminder ? 15 : 10));
+
     box.write(KS_WATER, model.value.toJson());
   }
 
-  void setGoal(int ml, {List<TimeOfDay>? reminders}) {
+  /// ---------------- Set goal + reminders ----------------
+  void setGoal(int goal, {List<WaterReminder>? reminders}) {
     model.update((m) {
       if (m == null) return;
-
-      m.goal = ml;
-      if (reminders != null) m.reminders = reminders;
+      m.goal = goal;
+      if (reminders != null) m.reminderList = reminders;
     });
     box.write(KS_WATER, model.value.toJson());
+  }
+
+  /// ---------------- Check if current time is before next reminder ----------------
+  bool isBeforeNextReminder() {
+    final now = DateTime.now();
+    final reminders = model.value.reminderList;
+    if (reminders.isEmpty) return true;
+
+    reminders.sort((a, b) =>
+    a.time.hour * 60 + a.time.minute - (b.time.hour * 60 + b.time.minute));
+
+    for (var r in reminders) {
+      final reminderTime =
+      DateTime(now.year, now.month, now.day, r.time.hour, r.time.minute);
+      if (now.isBefore(reminderTime)) return true;
+    }
+    return false;
   }
 }

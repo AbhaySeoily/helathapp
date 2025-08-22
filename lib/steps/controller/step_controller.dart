@@ -1,5 +1,5 @@
-// // StepsController
-// lib/steps/controller/step_controller.dart
+
+
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -9,84 +9,151 @@ import 'package:intl/intl.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'package:wellness_getx_app/steps/controller/step_background_handler.dart';
 
 import '../../main.dart';
+import '../../notification/notification_service.dart';
 import '../model/step_model.dart';
+import 'step_background_handler.dart';
 
-const String KS_STEPS = 'steps_model';
-const String KS_DAILY = 'dailySteps';          // Map<String yyyy-MM-dd, int>
-const String KS_BASELINE_PREFIX = 'baseline_'; // baseline_<date> : int
+const String KS_STEPS = 'steps_model';            // StepsModel JSON
+const String KS_DAILY = 'dailySteps';             // Map<String yyyy-MM-dd, int total>
+const String KS_BASELINE_PREFIX = 'baseline_';    // baseline_<date> : int (boot total at 1st event)
+
+const String KS_SLOW_PREFIX   = 'slow_';          // slow_<date>  : int
+const String KS_BRISK_PREFIX  = 'brisk_';         // brisk_<date> : int
+const String KS_RUNNING_PREFIX= 'running_';       // running_<date> : int
 
 class StepsController extends GetxController {
   final box = GetStorage();
 
-  /// UI model: today, goal, last7 (oldest → newest)
+  // Foreground cadence calculation (per-event)
+  DateTime? _lastStepEventTime;
+  int? _lastStepCount;
+
+  // UI model: today, goal, last7 (oldest → newest)
   Rx<StepsModel> model = StepsModel(today: 0, goal: 8000, last7: []).obs;
 
   late Stream<StepCount> _stepStream;
   StreamSubscription<StepCount>? _sub;
-  int _startSteps = 0; // today's baseline (boot total @midnight or first event)
+  int _startSteps = 0; // today's baseline (boot total @ 1st event)
   String _todayKey = DateFormat('yyyy-MM-dd').format(DateTime.now());
 
+  // segmented counters
+  final slowSteps = 0.obs;
+  final briskSteps = 0.obs;
+  int runningSteps = 0;
+
+  // notifications
   final FlutterLocalNotificationsPlugin _notifications = FlutterLocalNotificationsPlugin();
+
+  // date watcher (handles manual/auto date change even if no steps arrive)
+  Timer? _dateTicker;
 
   @override
   void onInit() {
     super.onInit();
     _initPermissions();
     _initNotifications();
-    _loadData();
+    _loadModelAndToday();   // loads model + today’s segmented counters
     _initPedometer();
-    _startBackgroundIfNotRunning();
+    _startForegroundService();
     _scheduleDailyNotification();
+    _startDateWatcher();
   }
 
-
+  /// ==============
+  /// INIT HELPERS
+  /// ==============
   Future<void> _initPermissions() async {
-    // Request activity recognition (step counting)
     await Permission.activityRecognition.request();
 
-    // Request location permissions (required for FGS with type 'location')
-    await Permission.locationWhenInUse.request();
+    // For foreground task stability on some devices:
+    await FlutterForegroundTask.requestIgnoreBatteryOptimization();
 
-    // If background location is needed:
+    // Only if your service uses location-type foreground service, else you may skip.
+    await Permission.locationWhenInUse.request();
     if (await Permission.locationWhenInUse.isGranted) {
       await Permission.locationAlways.request();
     }
-
-    // Battery optimization ignore (for bg service stability)
-    await FlutterForegroundTask.requestIgnoreBatteryOptimization();
-  }
-  void _initNotifications() async {
-    const AndroidInitializationSettings initializationSettingsAndroid =
-    AndroidInitializationSettings('ic_launcher');
-
-    const InitializationSettings initializationSettings =
-    InitializationSettings(android: initializationSettingsAndroid);
-
-    await _notifications.initialize(initializationSettings);
   }
 
-  /// Load saved model else construct from stored history (no fake)
-  void _loadData() {
+  Future<void> _initNotifications() async {
+    const AndroidInitializationSettings initAndroid = AndroidInitializationSettings('ic_launcher');
+    const InitializationSettings init = InitializationSettings(android: initAndroid);
+    await _notifications.initialize(init);
+  }
+
+  void _initPedometer() {
+    _stepStream = Pedometer.stepCountStream;
+    _sub = _stepStream.listen((event) {
+      print("CHECKING IN S S S SS ");
+      print(event.steps);
+      _onStepEvent(event.steps);
+    }, onError: (err) {
+      debugPrint("Pedometer error: $err");
+    });
+  }
+
+
+  Future<void> _startForegroundService() async {
+    final isRunning = await FlutterForegroundTask.isRunningService;
+    if (!isRunning) {
+      FlutterForegroundTask.startService(
+        notificationTitle: 'Step Tracker Running',
+        notificationText: 'Tracking your steps...',
+        callback: startCallback, // step_background_handler.dart
+      );
+    }
+  }
+
+
+
+
+  void _startDateWatcher() {
+    _dateTicker?.cancel();
+    _dateTicker = Timer.periodic(const Duration(seconds: 30), (_) => _ensureDateSync());
+  }
+
+  /// ============================
+  /// LOAD / SAVE & DATE SWITCHES
+  /// ============================
+  void _loadModelAndToday() {
+    // Load model (goal, last7, today)
     final stored = box.read(KS_STEPS);
     if (stored != null && stored is Map) {
       model.value = StepsModel.fromJson(Map.from(stored));
     }
 
-    // Always refresh last7 from real stored daily map
+    // last 7 strictly from KS_DAILY map
     model.update((m) {
       if (m == null) return;
       m.last7 = _loadLast7FromHistory();
     });
 
-    // Restore today's baseline if present
+    // baseline for today (if present)
     final baseline = box.read<int>("$KS_BASELINE_PREFIX$_todayKey");
     if (baseline != null) _startSteps = baseline;
+
+    // Load segmented counters for today's key
+    _loadSegmentsForDate(_todayKey);
+
+    // Keep model.today as "total segmented" if stored daily != current
+    _syncTodayFromSegments();
+    _persistModel();
   }
 
-  /// Build last7 from GetStorage 'dailySteps' (oldest → today)
+  void _loadSegmentsForDate(String dateKey) {
+    slowSteps.value = box.read<int>("$KS_SLOW_PREFIX$dateKey") ?? 0;
+    briskSteps.value = box.read<int>("$KS_BRISK_PREFIX$dateKey") ?? 0;
+    runningSteps   = box.read<int>("$KS_RUNNING_PREFIX$dateKey") ?? 0;
+  }
+
+  void _saveSegmentsForDate(String dateKey) {
+    box.write("$KS_SLOW_PREFIX$dateKey", slowSteps.value);
+    box.write("$KS_BRISK_PREFIX$dateKey", briskSteps.value);
+    box.write("$KS_RUNNING_PREFIX$dateKey", runningSteps);
+  }
+
   List<int> _loadLast7FromHistory() {
     final dailyMap = Map<String, int>.from(box.read(KS_DAILY) ?? {});
     final now = DateTime.now();
@@ -99,66 +166,10 @@ class StepsController extends GetxController {
     return result;
   }
 
-  void _initPedometer() {
-    _stepStream = Pedometer.stepCountStream;
-    _sub = _stepStream.listen((event) {
-      print("==================================================");
-      print(event.steps);
-      print("==================================================");
-      _onStepEvent(event.steps);
-    }, onError: (err) {
-      debugPrint("Pedometer error: $err");
-    });
-  }
-
-  void _onStepEvent(int totalStepsFromBoot) {
-    final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
-
-    // New day rollover handling
-    if (today != _todayKey) {
-      // Save yesterday's total
-      _saveDailySteps(_todayKey, model.value.today);
-
-      // switch to new day
-      _todayKey = today;
-      _startSteps = totalStepsFromBoot; // new baseline
-      box.write("$KS_BASELINE_PREFIX$_todayKey", _startSteps);
-
-      // refresh last7 from storage (yesterday persisted above)
-      _refreshLast7();
-    }
-
-    // If baseline not set (first event of the day / first app open)
-    if (_startSteps == 0) {
-      final savedBaseline = box.read<int>("$KS_BASELINE_PREFIX$_todayKey");
-      if (savedBaseline != null) {
-        _startSteps = savedBaseline;
-      } else {
-        _startSteps = totalStepsFromBoot;
-        box.write("$KS_BASELINE_PREFIX$_todayKey", _startSteps);
-
-      }
-    }
-
-    final todayCount = (totalStepsFromBoot - _startSteps).clamp(0, 1 << 31);
-    // Persist today's running value under today's key so monthly view gets live value
-    _saveDailySteps(_todayKey, todayCount);
-
-    model.update((m) {
-      if (m == null) return;
-      m.today = todayCount;
-
-      // ensure last7 exists & last entry is today
-      if (m.last7.isEmpty || m.last7.length != 7) {
-        m.last7 = _loadLast7FromHistory();
-      } else {
-        m.last7[m.last7.length - 1] = todayCount; // oldest..today
-      }
-    });
-
-    box.write(KS_STEPS, model.value.toJson());
-
-    _checkGoalAchievement(); // triggers notifications when appropriate
+  void _saveDailySteps(String dateKey, int steps) {
+    final dailyMap = Map<String, int>.from(box.read(KS_DAILY) ?? {});
+    dailyMap[dateKey] = steps;
+    box.write(KS_DAILY, dailyMap);
   }
 
   void _refreshLast7() {
@@ -168,74 +179,173 @@ class StepsController extends GetxController {
     });
   }
 
-  /// Save a single day's total in storage
-  void _saveDailySteps(String dateKey, int steps) {
-    final dailyMap = Map<String, int>.from(box.read(KS_DAILY) ?? {});
-    dailyMap[dateKey] = steps;
-    box.write(KS_DAILY, dailyMap);
+  void _persistModel() {
+    box.write(KS_STEPS, model.value.toJson());
   }
 
+  /// Called periodically to handle auto/manual date changes even when no steps arrive.
+  void _ensureDateSync() {
+    final currentKey = DateFormat('yyyy-MM-dd').format(DateTime.now());
+    if (currentKey == _todayKey) return;
+
+    // Day switched (past or future):
+    // 1) load segments of the new day (could be zeros if future/no data)
+    _todayKey = currentKey;
+    _loadSegmentsForDate(_todayKey);
+
+    // 2) Update model.today to reflect the new day's total (segments sum)
+    _syncTodayFromSegments();
+
+    // 3) Reset baseline; will be set on the first step event
+    _startSteps = 0;
+    box.remove("$KS_BASELINE_PREFIX$_todayKey");
+
+    // 4) Update last7 to reflect daily map (no fake data)
+    _refreshLast7();
+    _persistModel();
+    update();
+  }
+
+
+  void _syncTodayFromSegments() {
+    final total = slowSteps.value + briskSteps.value + runningSteps;
+    model.update((m) {
+      if (m == null) return;
+      m.today = total;
+    });
+    _saveDailySteps(_todayKey, total);
+  }
+
+  /// ==================
+  /// STEP EVENT HANDLER
+  /// ==================
+  void _onStepEvent(int totalStepsFromBoot) {
+    final now = DateTime.now();
+    final currentKey = DateFormat('yyyy-MM-dd').format(now);
+
+    // Day switch
+    if (currentKey != _todayKey) {
+      _syncTodayFromSegments(); // persist previous day
+      _todayKey = currentKey;
+      _startSteps = 0;
+      _lastStepEventTime = null;
+      _lastStepCount = null;
+      _loadSegmentsForDate(_todayKey); // load new day (likely 0)
+    }
+
+    // Baseline (first event of the day)
+    if (_startSteps == 0) {
+      final savedBaseline = box.read<int>("$KS_BASELINE_PREFIX$_todayKey");
+      _startSteps = savedBaseline ?? totalStepsFromBoot;
+      box.write("$KS_BASELINE_PREFIX$_todayKey", _startSteps);
+    }
+
+    // Cadence segmentation
+    if (_lastStepEventTime != null && _lastStepCount != null) {
+      final stepDiff = totalStepsFromBoot - _lastStepCount!;
+      final secDiff = now.difference(_lastStepEventTime!).inSeconds;
+
+      if (stepDiff > 0 && secDiff > 0) {
+        final spm = (stepDiff / secDiff) * 60; // steps per minute
+
+        if (spm < 100) {
+          slowSteps.value += stepDiff;
+        } else if (spm < 130) {
+          briskSteps.value += stepDiff;
+        } else {
+          runningSteps += stepDiff;
+        }
+
+        _saveSegmentsForDate(_todayKey);
+      }
+    }
+
+    _lastStepEventTime = now;
+    _lastStepCount = totalStepsFromBoot;
+
+    // ✅ UI + storage: always from segments
+    _syncTodayFromSegments();
+
+    // ✅ Notification check exactly with the same value UI shows
+    final todaySteps = model.value.today;
+    _checkGoalAchievement(todaySteps, model.value.goal);
+
+    _refreshLast7();
+    _persistModel();
+    update();
+  }
+
+
+
+  /// ===============
+  /// GOAL + NOTIFS
+  /// ===============
   void setGoal(int g) {
     model.update((m) {
       if (m == null) return;
       m.goal = g;
     });
-    box.write(KS_STEPS, model.value.toJson());
-    _checkGoalAchievement();
+    _persistModel();
+
+    // get today's steps
+    // Calculate today's steps from segments
+    final todaySteps = (slowSteps.value + briskSteps.value + runningSteps);
+    final goal = model.value.goal ?? 0;
+    _checkGoalAchievement(todaySteps,goal);
   }
 
-  Future<void> _startBackgroundIfNotRunning() async {
-    final isRunning = await FlutterForegroundTask.isRunningService;
-    if (!isRunning) {
-      FlutterForegroundTask.startService(
-        notificationTitle: 'Step Tracker Running',
-        notificationText: 'Tracking your steps...',
-        callback: startCallback, // defined in step_background_handler.dart
+
+  void _updateSteps(int todaySteps) {
+    final goal = model.value.goal ?? 0;
+    _checkGoalAchievement(todaySteps, goal);
+  }
+
+
+
+
+
+  void _checkGoalAchievement(int todaySteps, int goal) {
+    if (goal <= 0) return; // Agar goal set hi nahi hai
+
+    final todayKey = DateFormat('yyyy-MM-dd').format(DateTime.now());
+    final notifyKey = "goalNotified:$todayKey";
+
+    // Debug logs
+    debugPrint("🔍 [Goal Check] Date: $todayKey");
+    debugPrint("🔍 Goal set: $goal");
+    debugPrint("🔍 Today steps: $todaySteps");
+
+    // bool alreadyNotified = box.read(notifyKey) ?? false;
+    bool alreadyNotified = false;
+
+    debugPrint("🔍 Already Notified: $alreadyNotified");
+
+    // ✅ sirf tab trigger ho jab goal complete ya exceed ho
+    if (todaySteps >= goal && !alreadyNotified) {
+      debugPrint("🎉 Condition matched → Sending Notification!");
+
+      NotificationService.showNotification(
+        title: "Goal Achieved 🎉",
+        channelId: "step_channel",
+        channelName: "stepnoti",
+        body:  "Congrats! You've completed your step goal of $goal steps today.",
+
+
       );
+
+      box.write(notifyKey, true);
+    } else {
+      debugPrint("⚠️ Condition NOT matched → No Notification");
     }
   }
 
-  void _checkGoalAchievement() {
-    final m = model.value;
 
-    // Appreciation
-    if (m.today >= m.goal) {
-      _showGoalAchievedNotification();
-      return;
-    }
 
-    // Motivation if close (>=80% and not done)
-    if (m.today >= (m.goal * 0.8).floor() && m.today < m.goal) {
-      _showMotivationalNotification();
-    }
-  }
 
-  void _showGoalAchievedNotification() async {
-    const AndroidNotificationDetails androidPlatformChannelSpecifics =
-    AndroidNotificationDetails(
-      'goal_channel',
-      'Goal Achievements',
-      channelDescription: 'Notifications when you reach your step goal',
-      importance: Importance.high,
-      priority: Priority.high,
-      showWhen: false,
-    );
 
-    const NotificationDetails platformChannelSpecifics =
-    NotificationDetails(android: androidPlatformChannelSpecifics);
-
-    await _notifications.show(
-      100,
-      'Goal Achieved! 🎉',
-      'You reached your daily step goal of ${model.value.goal} steps!',
-      platformChannelSpecifics,
-    );
-  }
-
-  void _showMotivationalNotification() async {
+  Future<void> _showMotivationalNotification() async {
     final remaining = (model.value.goal - model.value.today).clamp(0, 1 << 31);
-    const AndroidNotificationDetails androidPlatformChannelSpecifics =
-    AndroidNotificationDetails(
+    const android = AndroidNotificationDetails(
       'motivation_channel',
       'Motivational',
       channelDescription: 'Notifications to motivate you to reach your step goal',
@@ -243,75 +353,85 @@ class StepsController extends GetxController {
       priority: Priority.defaultPriority,
       showWhen: false,
     );
-
-    const NotificationDetails platformChannelSpecifics =
-    NotificationDetails(android: androidPlatformChannelSpecifics);
-
+    const details = NotificationDetails(android: android);
     await _notifications.show(
       101,
       'Keep Going! 💪',
       'Only $remaining steps left to reach your goal!',
-      platformChannelSpecifics,
+      details,
     );
   }
 
-  /// Daily 8 PM summary notification (appreciate or motivate)
   void _scheduleDailyNotification() async {
-    // Quick and simple: show once now based on current state when called
-    // If you want exact 8 PM every day, keep your earlier zoned schedule code.
+    // Snapshot after 8 PM (simple version)
     final now = DateTime.now();
     if (now.hour >= 20) {
-      // after 8 PM: send a state snapshot
       final msg = model.value.today < model.value.goal
           ? 'You walked ${model.value.today} steps today. Keep moving!'
           : 'Great job! You hit your goal!';
-      const AndroidNotificationDetails androidPlatformChannelSpecifics =
-      AndroidNotificationDetails(
+      const android = AndroidNotificationDetails(
         'daily_reminder',
         'Daily Reminders',
         channelDescription: 'Daily step goal reminders',
         importance: Importance.high,
         priority: Priority.high,
       );
-      const NotificationDetails platformChannelSpecifics =
-      NotificationDetails(android: androidPlatformChannelSpecifics);
-
-      await _notifications.show(102, 'Daily Step Update', msg, platformChannelSpecifics);
+      const details = NotificationDetails(android: android);
+      await _notifications.show(102, 'Daily Step Update', msg, details);
     }
   }
 
-  /// Monthly date → steps map (no fake). Includes today’s live value.
+  /// ===========
+  /// MONTHLY API
+  /// ===========
   Future<Map<DateTime, int>> getMonthlySteps({DateTime? month}) async {
     final now = month ?? DateTime.now();
-    final first = DateTime(now.year, now.month, 1);
     final daysInMonth = DateUtils.getDaysInMonth(now.year, now.month);
-    final last = DateTime(now.year, now.month, daysInMonth);
-
     final stored = Map<String, int>.from(box.read(KS_DAILY) ?? {});
     final result = <DateTime, int>{};
 
     for (int d = 1; d <= daysInMonth; d++) {
       final date = DateTime(now.year, now.month, d);
-      if (date.isAfter(DateTime.now())) break;
-
       final key = DateFormat('yyyy-MM-dd').format(date);
+      // Allow past/future: if future, probably 0 or existing data if user changed date before
       result[date] = stored[key] ?? 0;
     }
 
-    // Ensure today (if current month) reflects live value
+    // ensure "today" index reflects live sum (if in this month)
     final today = DateTime.now();
     if (today.year == now.year && today.month == now.month) {
       final tKey = DateFormat('yyyy-MM-dd').format(today);
-      result[today] = stored[tKey] ?? model.value.today;
+      result[today] = stored[tKey] ?? (slowSteps.value + briskSteps.value + runningSteps);
     }
-
     return result;
+  }
+
+
+  void _checkGoal(int todaySteps) {
+    final goal = box.read<int>("step_goal") ?? 0;
+
+    if (goal > 0 && todaySteps >= goal) {
+      final isGoalAlreadyNotified = box.read<bool>("goal_notified_${DateTime.now().toString().substring(0,10)}") ?? false;
+
+      if (!isGoalAlreadyNotified) {
+        NotificationService.showNotification(
+          title: "Goal Achieved 🎉",
+          channelId: "step_channel",
+          channelName: "stepnoti",
+          body:  "Congrats! You've completed your step goal of $goal steps today.",
+
+        );
+
+        // save flag so multiple notifications na aaye
+        box.write("goal_notified_${DateTime.now().toString().substring(0,10)}", true);
+      }
+    }
   }
 
   @override
   void onClose() {
     _sub?.cancel();
+    _dateTicker?.cancel();
     super.onClose();
   }
 }
-

@@ -130,8 +130,24 @@ class DashboardScreen extends StatelessWidget {
 
         Obx(() {
           final w = dc.water.model.value;
-          final todayIntake = w.intakeToday(); // <-- now returns correct value
+          final todayIntake = w.intakeToday(); // gets today's total
           final pct = (todayIntake / (w.goal == 0 ? 1 : w.goal)).clamp(0.0, 1.0);
+          final points = dc.water.box.read(KS_WATER_REWARD) ?? 0;
+
+          /// Helper to add water with reward points based on reminder
+          void _addWaterWithReward(int ml) {
+            final beforeReminder = dc.water.isBeforeNextReminder();
+            dc.water.addWater(ml, beforeReminder: beforeReminder);
+
+            // Optional: show snackbar for points
+            Get.snackbar(
+              "Water Logged",
+              beforeReminder
+                  ? "+15 points (before reminder)"
+                  : "+10 points (after reminder)",
+              snackPosition: SnackPosition.BOTTOM,
+            );
+          }
 
           return _card(
             leading: Container(
@@ -147,6 +163,8 @@ class DashboardScreen extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text('$todayIntake / ${w.goal} ml', style: TextStyle(fontSize: 16)),
+                SizedBox(height: 4),
+                Text('Reward Points: $points', style: TextStyle(fontSize: 14, color: Colors.green)),
                 SizedBox(height: 6),
                 LinearProgressIndicator(
                   value: pct,
@@ -158,12 +176,16 @@ class DashboardScreen extends StatelessWidget {
             ),
             actions: [
               ElevatedButton(
-                onPressed: () => dc.water.addWater(100),
+                onPressed: () => _addWaterWithReward(100),
                 child: Text('+100ml'),
               ),
               ElevatedButton(
-                onPressed: () => dc.water.addWater(250),
+                onPressed: () => _addWaterWithReward(250),
                 child: Text('+250ml'),
+              ),
+              ElevatedButton(
+                onPressed: () => _addWaterWithReward(500),
+                child: Text('+500ml'),
               ),
               OutlinedButton(
                 onPressed: () => Get.to(() => WaterScreen()),
@@ -172,6 +194,7 @@ class DashboardScreen extends StatelessWidget {
             ],
           );
         }),
+
 
 
 
