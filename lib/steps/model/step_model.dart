@@ -4,7 +4,11 @@ class StepsModel {
   int goal;
   List<int> last7;
 
-  StepsModel({required this.today, required this.goal, required this.last7});
+  StepsModel({
+    required this.today,
+    required this.goal,
+    required this.last7,
+  });
 
   Map<String, dynamic> toJson() => {
     'today': today,
@@ -16,5 +20,12 @@ class StepsModel {
     today: j['today'] ?? 0,
     goal: j['goal'] ?? 8000,
     last7: List<int>.from(j['last7'] ?? const []),
+  );
+
+  /// ✅ Default empty model
+  factory StepsModel.empty() => StepsModel(
+    today: 0,
+    goal: 8000,
+    last7: [],
   );
 }

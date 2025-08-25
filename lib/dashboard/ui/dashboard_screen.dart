@@ -309,7 +309,7 @@ class DashboardScreen extends StatelessWidget {
       content: TextField(controller: tc, keyboardType: TextInputType.number),
       actions: [ TextButton(onPressed: ()=> Get.back(), child: Text('Cancel')), TextButton(onPressed: (){
         final v = int.tryParse(tc.text.trim());
-        if (v!=null) dc.steps.setGoal(v);
+        if (v!=null) dc.steps.setDailyGoal(v);
         Get.back();
       }, child: Text('Save')) ],
     ));
